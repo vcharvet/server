@@ -116,6 +116,7 @@ use OCP\IL10N;
 use OCP\IServerContainer;
 use OCP\ITempManager;
 use OCP\Contacts\ContactsMenu\IActionFactory;
+use OCP\IUser;
 use OCP\Lock\ILockingProvider;
 use OCP\RichObjectStrings\IValidator;
 use OCP\Security\IContentSecurityPolicyManager;
@@ -1087,6 +1088,28 @@ class Server extends ServerContainer implements IServerContainer {
 			return new ShareHelper(
 				$c->query(\OCP\Share\IManager::class)
 			);
+		});
+
+		$this->connectDispatcher();
+	}
+
+	private function connectDispatcher() {
+		$dispatcher = $this->getEventDispatcher();
+
+		// Delete avatar on user deletion
+		$dispatcher->addListener('OCP\IUser::preDelete', function(GenericEvent $e) {
+			$logger = $this->getLogger();
+			$manager = $this->getAvatarManager();
+			/** @var IUser $user */
+			$user = $e->getSubject();
+
+			try {
+				$avatar = $manager->getAvatar($user->getUID());
+				$avatar->remove();
+			} catch (\Exception $e) {
+				// Ignore exceptions
+				$logger->info('Could not cleanup avatar of ' . $user->getUID());
+			}
 		});
 	}
 
